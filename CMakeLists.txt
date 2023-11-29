@@ -36,7 +36,6 @@ set(INCLUDES
     src/core/Matrix.hpp
     src/core/Vector3D.hpp
     src/core/Point.hpp
-    src/core/RotateCursor.hpp
 )
 
 # Make a list of all of the directories to look in when doing #include "whatever.h"
