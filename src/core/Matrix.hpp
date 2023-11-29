@@ -27,96 +27,120 @@ struct Matrix {
 	static constexpr size_t Columns = Dimensions;
 	static constexpr size_t Size = Rows * Columns;
 
-	// Underlying Array
-	std::array<T, Size> m;
-
 public:
+	Matrix()
+		:
+		fArray()
+	{
+		Reset();
+	}
+
+	constexpr void
+	ApplyTransforms()
+	{
+		Identity();
+
+		// Apply Scaling
+		doScaleX(fScaleX);
+		doScaleY(fScaleY);
+
+		// Apply Rotation
+		doRotate2D(fRotation);
+
+		// Apply Translation
+		doTranslateX(fTranslateX);
+		doTranslateY(fTranslateY);
+	}
+
 	// Access like raw array
-	operator const T*() const { return m.data(); }
+	constexpr operator const T*() const { return fArray.data(); }
 
 	// Unchecked Access
-	constexpr T& operator[](size_t index) { return m[index]; }
-	constexpr const T& operator[](size_t index) const { return m[index]; }
+	constexpr T& operator[](size_t index) { return fArray[index]; }
 
-	constexpr T&
-	operator()(size_t row, size_t column)
-	{
-		return m[rowAndColToIndex(row, column)];
-	}
+	constexpr const T& operator[](size_t index) const { return fArray[index]; }
 
-	constexpr const T&
-	operator()(size_t row, size_t column) const
-	{
-		return m[rowAndColToIndex(row, column)];
-	}
+	constexpr T& operator()(size_t row, size_t column) { return fArray[rowAndColToIndex(row, column)]; }
+
+	constexpr const T& operator()(size_t row, size_t column) const { return fArray[rowAndColToIndex(row, column)]; }
 
 	// Checked Access
-	constexpr std::optional<T&>
+	constexpr std::optional<T &>
 	At(size_t row, size_t column)
 	{
 		if (row > Rows || column > Columns)
 			return {};
 
-		return m[rowAndColToIndex(row, column)];
+		return fArray[rowAndColToIndex(row, column)];
 	}
 
-	constexpr std::optional<T&>
+	constexpr std::optional<T &>
 	At(size_t index)
 	{
 		if (index >= Size)
 			return {};
 
-		return m[index];
+		return fArray[index];
 	}
 
-	void
+	/** Identity Matrix */
+	constexpr void
+	Identity()
+	{
+		fArray.fill(0);
+		for (size_t index = 0; index < Size; index += (Dimensions + 1))
+			fArray[index] = 1;
+	}
+
+
+	constexpr void
 	Reset()
 	{
-		m.fill(0);
-		for (size_t index = 0; index < Size; index += (Dimensions + 1))
-			m[index] = 1;
+		fScaleX = 1.f;
+		fScaleY = 1.f;
+		fTranslateX = 0.f;
+		fTranslateY = 0.f;
+		fRotation = 0.f;
+
+		Identity();
 	}
 
 	/** Scale */
 
-	void
+	constexpr void
 	ScaleUniformBy(const T& factor)
 	{
-		for (size_t index = 0; index < Size; index += (Dimensions + 1))
-			m[index] *= factor;
+		fScaleX += factor;
+		fScaleY += factor;
+
+		ApplyTransforms();
 	}
 
-	void
+	constexpr void
 	ScaleXBy(const T& factor)
 	{
-		Matrix<T, Dimensions> scaleMatrix;
-		scaleMatrix.Reset();
-		scaleMatrix[0] = factor;
-
-		this->MultiplyBy(scaleMatrix);
+		fScaleX += factor;
+		ApplyTransforms();
 	}
 
-	void
+	constexpr void
 	ScaleYBy(const T& factor)
 	requires(Dimensions >= 2)
 	{
-		Matrix<T, Dimensions> scaleMatrix;
-		scaleMatrix.Reset();
-		scaleMatrix[Dimensions + 1] = factor;
-
-		this->MultiplyBy(scaleMatrix);
+		fScaleY += factor;
+		ApplyTransforms();
 	}
 
-	void
-	ScaleZBy(const T& factor)
-	requires(Dimensions >= 3)
-	{
-		Matrix<T, Dimensions> scaleMatrix;
-		scaleMatrix.Reset();
-		scaleMatrix[(Dimensions * 2) + 2] = factor;
-
-		this->MultiplyBy(scaleMatrix);
-	}
+//	void
+//	ScaleZBy(const T &factor)
+//	requires(Dimensions >= 3)
+//	{
+//		Matrix<T, Dimensions> scaleMatrix;
+//		scaleMatrix.Reset();
+//		scaleMatrix[(Dimensions * 2) + 2] = factor;
+//
+//		this->MultiplyBy(scaleMatrix);
+//	}
 
 
 	/** Rotate */
@@ -124,65 +148,43 @@ public:
 	Rotate2DBy(const T& radians)
 	requires(Dimensions >= 2)
 	{
-		if (radians == 0)
-			return;
-
-		T cosRads = std::cos(radians);
-		T sinRads = std::sin(radians);
-
-		// Rotate around Z-axis
-		Matrix<T, 4> rotationMatrix = {
-			cosRads,	-1 * sinRads,	0,	0,
-			sinRads,	cosRads,		0,	0,
-			0,			0,				1,	0,
-			0,			0,				0,	1
-		};
-
-		this->MultiplyBy(rotationMatrix);
+		fRotation += radians;
+		ApplyTransforms();
 	}
 
 	/** Translate */
 	void
-	TranslateUniformBy(const T& factor)
+	TranslateUniformBy(const T& offset)
 	{
-		for (size_t index = Dimensions - 1; index < Size; index += Dimensions)
-			m[index] += factor;
-	}
-
-	static const size_t kTranslateRowBegin = Rows * (Columns - 1);
-
-	void
-	TranslateXBy(const T& factor)
-	requires(Dimensions >= 3)
-	{
-		Matrix<T, Dimensions> translateMatrix;
-		translateMatrix.Reset();
-		translateMatrix[kTranslateRowBegin] = factor;
-
-		this->MultiplyBy(translateMatrix);
+		fTranslateX += offset;
+		fTranslateY += offset;
+		ApplyTransforms();
 	}
 
 	void
-	TranslateYBy(const T& factor)
+	TranslateXBy(const T& offset)
 	requires(Dimensions >= 3)
 	{
-		Matrix<T, Dimensions> translateMatrix;
-		translateMatrix.Reset();
-		translateMatrix[kTranslateRowBegin + 1] = factor;
-
-		this->MultiplyBy(translateMatrix);
+		fTranslateX += offset;
+		ApplyTransforms();
 	}
 
 	void
-	TranslateZBy(const T& factor)
+	TranslateYBy(const T& offset)
 	requires(Dimensions >= 3)
 	{
-		Matrix<T, Dimensions> translateMatrix;
-		translateMatrix.Reset();
-		translateMatrix[kTranslateRowBegin + 2] = factor;
-
-		this->MultiplyBy(translateMatrix);
+		fTranslateY += offset;
+		ApplyTransforms();
 	}
+
+//	void
+//	TranslateZBy(const T &factor) requires(Dimensions >= 3) {
+//		Matrix<T, Dimensions> translateMatrix;
+//		translateMatrix.Reset();
+//		translateMatrix[kTranslateRowBegin + 2] = factor;
+//
+//		this->MultiplyBy(translateMatrix);
+//	}
 
 
 	// Matrix Multiplication
@@ -195,12 +197,13 @@ public:
 			for (size_t column = 0; column < Dimensions; column++) {
 				matrixC(row, column) = 0;
 				for (size_t calcOffset = 0; calcOffset < Dimensions; calcOffset++) {
-					matrixC(row, column) += (this->operator()(row, calcOffset) * other[rowAndColToIndex(calcOffset, column)]);
+					matrixC(row, column) += (this->operator()(row, calcOffset) *
+											 other[rowAndColToIndex(calcOffset, column)]);
 				}
 			}
 		}
 
-		m = matrixC.m;
+		fArray = matrixC.fArray;
 	}
 
 
@@ -213,12 +216,13 @@ public:
 			for (size_t column = 0; column < Dimensions; column++) {
 				matrixC(row, column) = 0;
 				for (size_t calcOffset = 0; calcOffset < Dimensions; calcOffset++) {
-					matrixC(row, column) += (this->operator()(row, calcOffset) * other[rowAndColToIndex(calcOffset, column)]);
+					matrixC(row, column) += (this->operator()(row, calcOffset) *
+											 other[rowAndColToIndex(calcOffset, column)]);
 				}
 			}
 		}
 
-		m = matrixC.m;
+		fArray = matrixC.fArray;
 	}
 
 
@@ -231,7 +235,8 @@ public:
 			for (size_t column = 0; column < Dimensions; column++) {
 				matrixC(row, column) = 0;
 				for (size_t calcOffset = 0; calcOffset < Dimensions; calcOffset++) {
-					matrixC(row, column) += (this->operator()(row, calcOffset) * other[rowAndColToIndex(calcOffset, column)]);
+					matrixC(row, column) += (this->operator()(row, calcOffset) *
+											 other[rowAndColToIndex(calcOffset, column)]);
 				}
 			}
 		}
@@ -246,23 +251,107 @@ public:
 	operator*=(const Vector3D<T>& other)
 	requires(Dimensions == 3 || Dimensions == 4)
 	{
-		m[0] *= other.dx;
-		m[1] *= other.dy;
-		m[2] *= other.dz;
+		fArray[0] *= other.dx;
+		fArray[1] *= other.dy;
+		fArray[2] *= other.dz;
 
-		m[Dimensions] *= other.dx;
-		m[Dimensions + 1] *= other.dy;
-		m[Dimensions + 2] *= other.dz;
+		fArray[Dimensions] *= other.dx;
+		fArray[Dimensions + 1] *= other.dy;
+		fArray[Dimensions + 2] *= other.dz;
 
-		m[(Dimensions * 2)] *= other.dx;
-		m[(Dimensions * 2) + 1] *= other.dy;
-		m[(Dimensions * 2) + 2] *= other.dz;
+		fArray[(Dimensions * 2)] *= other.dx;
+		fArray[(Dimensions * 2) + 1] *= other.dy;
+		fArray[(Dimensions * 2) + 2] *= other.dz;
 
 		return *this;
 	}
 
 private:
 	constexpr size_t rowAndColToIndex(size_t row, size_t column) { return (row * Columns) + column; }
+
+	void
+	doScaleX(T factor)
+	{
+		if (factor == 0)
+			return;
+
+		Matrix<T, Dimensions> scaleMatrix;
+		scaleMatrix[0] = factor;
+
+		this->MultiplyBy(scaleMatrix);
+	}
+
+	void
+	doScaleY(T factor)
+	{
+		if (factor == 0)
+			return;
+
+		Matrix<T, Dimensions> scaleMatrix;
+		scaleMatrix[Dimensions + 1] = factor;
+
+		this->MultiplyBy(scaleMatrix);
+	}
+
+
+	static constexpr const size_t kTranslateX = 12;
+
+	void
+	doTranslateX(T offset)
+	{
+		if (offset == 0)
+			return;
+
+		Matrix<T, Dimensions> translateMatrix;
+		translateMatrix[kTranslateX] = offset;
+
+		this->MultiplyBy(translateMatrix);
+	}
+
+
+	static constexpr const size_t kTranslateY = 13;
+
+	void
+	doTranslateY(T offset)
+	{
+		if (offset == 0)
+			return;
+
+		Matrix<T, Dimensions> translateMatrix;
+		translateMatrix[kTranslateY] = offset;
+
+		this->MultiplyBy(translateMatrix);
+	}
+
+	void
+	doRotate2D(T radians)
+	{
+		if (radians == 0)
+			return;
+
+		double cosRads = std::cos(radians);
+		double sinRads = std::sin(radians);
+
+		// Rotate around Z-axis
+		std::array<T, Size> rotationArray = {
+			cosRads,	-1 * sinRads,	0,	0,
+			sinRads,	cosRads,		0,	0,
+			0,			0,				1,	0,
+			0,			0,				0,	1
+		};
+
+		this->MultiplyBy(rotationArray);
+	}
+
+private:
+	// Underlying Array
+	std::array<T, Size> fArray;
+
+	float fScaleX = 1.f;
+	float fScaleY = 1.f;
+	float fTranslateX = 0.f;
+	float fTranslateY = 0.f;
+	float fRotation = 0.f;
 };
 
 /** Stream Operator */
