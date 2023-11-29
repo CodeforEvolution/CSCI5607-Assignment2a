@@ -50,6 +50,8 @@ GLint window_height = 500;
 
 // Coordinate Conversion Globals
 const double kMouseMovementScale = 0.004;
+const float	kScaleIncrement = 0.05;
+const float	kScaleDecrement = -0.05;
 
 // Some different cursors
 GLFWcursor *arrow_cursor = nullptr, *crosshair_cursor = nullptr, *move_cursor = nullptr;
@@ -84,25 +86,25 @@ key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 
 		case GLFW_KEY_LEFT:
 		{
-			M.ScaleXBy(0.95f);
+			M.ScaleXBy(kScaleDecrement);
 			break;
 		}
 
 		case GLFW_KEY_RIGHT:
 		{
-			M.ScaleXBy(1.05f);
+			M.ScaleXBy(kScaleIncrement);
 			break;
 		}
 
 		case GLFW_KEY_UP:
 		{
-			M.ScaleYBy(1.05f);
+			M.ScaleYBy(kScaleIncrement);
 			break;
 		}
 
 		case GLFW_KEY_DOWN:
 		{
-			M.ScaleYBy(0.95f);
+			M.ScaleYBy(kScaleDecrement);
 			break;
 		}
 
@@ -298,7 +300,7 @@ main(int argc, char* argv[])
         // sanity check that your matrix contents are what you expect them to be
         if (DEBUG_ON)
 			printf("M = [%f %f %f %f\n     %f %f %f %f\n     %f %f %f %f\n     %f %f %f %f]\n",M[0],M[4],M[8],M[12], M[1],M[5],M[9],M[13], M[2],M[6],M[10],M[14], M[3],M[7],M[11],M[15]);
-        
+
         glUniformMatrix4fv(gUniformMatrixLocation, 1, GL_FALSE, M );   // send the updated model transformation matrix to the GPU
 		glDrawArrays( GL_TRIANGLES, 0, NVERTICES );    // draw a triangle between the first vertex and each successive vertex pair in the hard-coded model
 		glFlush();	// ensure that all OpenGL calls have executed before swapping buffers
